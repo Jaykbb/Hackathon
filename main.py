@@ -6,12 +6,14 @@ from sklearn.model_selection import train_test_split
 
 # Imports Qiskit
 from qiskit.circuit.library import ZZFeatureMap, RealAmplitudes
-from qiskit_algorithms.optimizers import COBYLA
+from qiskit_machine_learning.optimizers import COBYLA
 from qiskit_algorithms.utils import algorithm_globals
 from qiskit_machine_learning.algorithms import VQC
-
+from tqdm.auto import tqdm
 
 df = pd.read_csv("dataset_paper/dataset_paper/financial_train.csv")
+
+df = pd.read_csv("american_bankruptcy_dataset.csv")
 
 #y (minuscule) = la cible (0 = faillite, 1 = saine)
 y = df["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
@@ -26,7 +28,7 @@ np.random.seed(123)
 idx_0 = np.where(y == 0)[0]  # indices des faillites
 idx_1 = np.where(y == 1)[0]  # indices des saines
 
-n_samples = min(200, len(idx_0), len(idx_1))
+n_samples = min(1000, len(idx_0), len(idx_1))
 
 chosen_0 = np.random.choice(idx_0, size=n_samples, replace=False)
 chosen_1 = np.random.choice(idx_1, size=n_samples, replace=False)
@@ -63,14 +65,31 @@ n_qubits = 6
 feature_map = ZZFeatureMap(feature_dimension=n_qubits, reps=1, entanglement="linear")
 ansatz = RealAmplitudes(num_qubits=n_qubits, reps=2, entanglement="linear")
 
+maxiter = 100
+
+
+def callback(weights, loss):
+    progress.update(1)
+
 vqc = VQC(
     feature_map=feature_map,
     ansatz=ansatz,
-    optimizer=COBYLA(maxiter=100)
+    optimizer=COBYLA(maxiter=maxiter),
+    callback=callback
 )
 
 print("Entraînement du VQC en cours sur vos données...")
-vqc.fit(train_features, train_labels)
+
+progress = tqdm(
+    total=maxiter,
+    desc="Entraînement VQC",
+    bar_format="{desc}: {percentage:3.0f}% {bar} | {elapsed}",
+)
+
+try:
+    vqc.fit(train_features, train_labels)
+finally:
+    progress.close()
 
 
 score = vqc.score(test_features, test_labels)
