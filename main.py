@@ -1,43 +1,80 @@
 import numpy as np
 import pandas as pd
-from qiskit.circuit.library import n_local, zz_feature_map
-from qiskit_machine_learning.optimizers import COBYLA
-from qiskit_machine_learning.utils import algorithm_globals
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+
+# Imports Qiskit
+from qiskit.circuit.library import ZZFeatureMap, RealAmplitudes
+from qiskit_algorithms.optimizers import COBYLA
+from qiskit_algorithms.utils import algorithm_globals
 from qiskit_machine_learning.algorithms import VQC
-from qiskit_machine_learning.datasets import ad_hoc_data
 
-def dataframe(x):
-    df = pd.read_csv(f"{x}")
-    x = df["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy() #si compagnie est alive =1 si fail = 0
-    y = df.drop(columns = ["status_label", "fyear", "company_name","Division","MajorGroup"]) # Enlever les colonnes inutile
-    y = y.to_numpy(dtype=float) #Mettre les 18 caractéristique en array numpy
-    
 
-dataframe("american_bankruptcy_dataset.csv")
+df = pd.read_csv("american_bankruptcy_dataset.csv")
 
-def VQC(x):
-    seed = 1376
-algorithm_globals.random_seed = seed
+# y (minuscule) = la cible (0 = faillite, 1 = saine)
+y = df["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
 
-# Use ad hoc data set for training and test data
-feature_dim = 2  # dimension of each data point
-training_size = 20
-test_size = 10
+# X (majuscule) = la matrice des 18 ratios financiers
+X_df = df.drop(columns=["status_label", "fyear", "company_name", "Division", "MajorGroup"])
+X = X_df.to_numpy(dtype=float)
 
-# training features, training labels, test features, test labels as np.ndarray,
-# one hot encoding for labels
-training_features, training_labels, test_features, test_labels = ad_hoc_data(
-    training_size=training_size, test_size=test_size, n=feature_dim, gap=0.3
+# Sécurité pour éviter que d'éventuels NaN ne fassent planter la PCA
+X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+
+
+np.random.seed(123)
+
+idx_0 = np.where(y == 0)[0]  # indices des faillites
+idx_1 = np.where(y == 1)[0]  # indices des saines
+
+n_samples = min(100, len(idx_0), len(idx_1))
+
+chosen_0 = np.random.choice(idx_0, size=n_samples, replace=False)
+chosen_1 = np.random.choice(idx_1, size=n_samples, replace=False)
+
+indices = np.concatenate([chosen_0, chosen_1])
+np.random.shuffle(indices)
+
+X_balanced = X[indices]
+y_balanced = y[indices]
+
+print(f"Jeu équilibré : {len(y_balanced)} entreprises au total ({n_samples} faillites, {n_samples} saines).")
+
+
+pca = PCA(n_components=5)
+X_5d = pca.fit_transform(X_balanced)
+
+# Conversion des valeurs en angles (radians) pour les portes quantiques
+scaler = MinMaxScaler(feature_range=(0, np.pi))
+X_scaled = scaler.fit_transform(X_5d)
+
+
+train_features, test_features, train_labels, test_labels = train_test_split(
+    X_scaled,
+    y_balanced,
+    train_size=0.8,
+    random_state=123,
+    stratify=y_balanced
 )
 
-feature_map = zz_feature_map(feature_dimension=feature_dim, reps=2, entanglement="linear")
-ansatz = n_local(feature_map.num_qubits, ["ry", "rz"], "cz", reps=3)
+
+algorithm_globals.random_seed = 123
+n_qubits = 5
+
+feature_map = ZZFeatureMap(feature_dimension=n_qubits, reps=1, entanglement="linear")
+ansatz = RealAmplitudes(num_qubits=n_qubits, reps=2, entanglement="linear")
+
 vqc = VQC(
     feature_map=feature_map,
     ansatz=ansatz,
-    optimizer=COBYLA(maxiter=100),
+    optimizer=COBYLA(maxiter=100)
 )
-vqc.fit(training_features, training_labels)
+
+print("Entraînement du VQC en cours sur vos données...")
+vqc.fit(train_features, train_labels)
+
 
 score = vqc.score(test_features, test_labels)
-print(f"Testing accuracy: {score:0.2f}")
+print(f"Précision (Accuracy) sur le jeu de test : {score * 100:.2f} %")
