@@ -20,8 +20,6 @@ y = df["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
 X_df = df.drop(columns=["status_label", "fyear", "company_name", "Division", "MajorGroup"])
 X = X_df.to_numpy(dtype=float)
 
-# Sécurité pour éviter que d'éventuels NaN ne fassent planter la PCA
-X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
 
 
 np.random.seed(123)
@@ -29,7 +27,7 @@ np.random.seed(123)
 idx_0 = np.where(y == 0)[0]  # indices des faillites
 idx_1 = np.where(y == 1)[0]  # indices des saines
 
-n_samples = min(100, len(idx_0), len(idx_1))
+n_samples = min(1000, len(idx_0), len(idx_1))
 
 chosen_0 = np.random.choice(idx_0, size=n_samples, replace=False)
 chosen_1 = np.random.choice(idx_1, size=n_samples, replace=False)
@@ -43,7 +41,7 @@ y_balanced = y[indices]
 print(f"Jeu équilibré : {len(y_balanced)} entreprises au total ({n_samples} faillites, {n_samples} saines).")
 
 
-pca = PCA(n_components=5)
+pca = PCA(n_components=6)
 X_5d = pca.fit_transform(X_balanced)
 
 # Conversion des valeurs en angles (radians) pour les portes quantiques
@@ -61,7 +59,7 @@ train_features, test_features, train_labels, test_labels = train_test_split(
 
 
 algorithm_globals.random_seed = 123
-n_qubits = 5
+n_qubits = 6
 
 feature_map = ZZFeatureMap(feature_dimension=n_qubits, reps=1, entanglement="linear")
 ansatz = RealAmplitudes(num_qubits=n_qubits, reps=2, entanglement="linear")
