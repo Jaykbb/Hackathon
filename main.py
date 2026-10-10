@@ -11,17 +11,16 @@ from qiskit_algorithms.utils import algorithm_globals
 from qiskit_machine_learning.algorithms import VQC
 from tqdm.auto import tqdm
 
+df = pd.read_csv("dataset_paper/dataset_paper/financial_train.csv")
+
 df = pd.read_csv("american_bankruptcy_dataset.csv")
 
-# y (minuscule) = la cible (0 = faillite, 1 = saine)
+#y (minuscule) = la cible (0 = faillite, 1 = saine)
 y = df["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
-
-# X (majuscule) = la matrice des 18 ratios financiers
-X_df = df.drop(columns=["status_label", "fyear", "company_name", "Division", "MajorGroup"])
+#X (majuscule) = la matrice des 18 ratios financiers
+X_df = df.drop(columns=["status_label", "fyear", "cik"])
 X = X_df.to_numpy(dtype=float)
 
-# Sécurité pour éviter que d'éventuels NaN ne fassent planter la PCA
-X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
 
 
 np.random.seed(123)
@@ -43,7 +42,7 @@ y_balanced = y[indices]
 print(f"Jeu équilibré : {len(y_balanced)} entreprises au total ({n_samples} faillites, {n_samples} saines).")
 
 
-pca = PCA(n_components=5)
+pca = PCA(n_components=6)
 X_5d = pca.fit_transform(X_balanced)
 
 # Conversion des valeurs en angles (radians) pour les portes quantiques
@@ -61,7 +60,7 @@ train_features, test_features, train_labels, test_labels = train_test_split(
 
 
 algorithm_globals.random_seed = 123
-n_qubits = 5
+n_qubits = 6
 
 feature_map = ZZFeatureMap(feature_dimension=n_qubits, reps=1, entanglement="linear")
 ansatz = RealAmplitudes(num_qubits=n_qubits, reps=2, entanglement="linear")
