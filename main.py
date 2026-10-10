@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
 
 # Imports Qiskit
 from qiskit.circuit.library import ZZFeatureMap, RealAmplitudes
@@ -11,22 +11,23 @@ from qiskit_algorithms.utils import algorithm_globals
 from qiskit_machine_learning.algorithms import VQC
 
 
-df = pd.read_csv("dataset_paper/dataset_paper/financial_train.csv")
+df_train = pd.read_csv("dataset_paper/dataset_paper/financial_train.csv")
 
-#y (minuscule) = la cible (0 = faillite, 1 = saine)
-y = df["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
-#X (majuscule) = la matrice des 18 ratios financiers
-X_df = df.drop(columns=["status_label", "fyear", "cik"])
-X = X_df.to_numpy(dtype=float)
+# Cible y_train (0 = faillite, 1 = saine)
+y_train = df_train["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
+
+# Matrice des ratios financiers X_train
+X_train_df = df_train.drop(columns=["status_label", "fyear", "cik"])
+X_train = X_train_df.to_numpy(dtype=float)
 
 
-
+# Équilibrage des classes (200 de chaque pour le train)
 np.random.seed(123)
 
-idx_0 = np.where(y == 0)[0]  # indices des faillites
-idx_1 = np.where(y == 1)[0]  # indices des saines
+idx_0 = np.where(y_train == 0)[0]
+idx_1 = np.where(y_train == 1)[0]
 
-n_samples = min(200, len(idx_0), len(idx_1))
+n_samples = min(1000, len(idx_0), len(idx_1))
 
 chosen_0 = np.random.choice(idx_0, size=n_samples, replace=False)
 chosen_1 = np.random.choice(idx_1, size=n_samples, replace=False)
@@ -34,27 +35,36 @@ chosen_1 = np.random.choice(idx_1, size=n_samples, replace=False)
 indices = np.concatenate([chosen_0, chosen_1])
 np.random.shuffle(indices)
 
-X_balanced = X[indices]
-y_balanced = y[indices]
+X_balanced = X_train[indices]
+y_balanced = y_train[indices]
 
-print(f"Jeu équilibré : {len(y_balanced)} entreprises au total ({n_samples} faillites, {n_samples} saines).")
+print(f"Jeu d'entraînement équilibré : {len(y_balanced)} entreprises ({n_samples} faillites, {n_samples} saines).")
 
-
+# Compression PCA 
 pca = PCA(n_components=6)
-X_5d = pca.fit_transform(X_balanced)
+X_train_pca = pca.fit_transform(X_balanced)
 
-# Conversion des valeurs en angles (radians) pour les portes quantiques
+# Normalisation angulaire [0, pi]
 scaler = MinMaxScaler(feature_range=(0, np.pi))
-X_scaled = scaler.fit_transform(X_5d)
+train_features = scaler.fit_transform(X_train_pca)
+train_labels = y_balanced
 
 
-train_features, test_features, train_labels, test_labels = train_test_split(
-    X_scaled,
-    y_balanced,
-    train_size=0.8,
-    random_state=123,
-    stratify=y_balanced
-)
+df_test = pd.read_csv("dataset_paper/dataset_paper/financial_test.csv")
+
+# Cible y_test
+test_labels = df_test["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
+
+# Matrice X_test
+X_test_df = df_test.drop(columns=["status_label", "fyear", "cik"])
+X_test = X_test_df.to_numpy(dtype=float)
+X_test = np.nan_to_num(X_test, nan=0.0, posinf=0.0, neginf=0.0)
+
+# Projection PCA et normalisation avec les estimateurs déjà ajustés
+X_test_pca = pca.transform(X_test)
+test_features = scaler.transform(X_test_pca)
+
+print(f"Jeu de test prêt : {len(test_labels)} entreprises.")
 
 
 algorithm_globals.random_seed = 123
@@ -66,12 +76,21 @@ ansatz = RealAmplitudes(num_qubits=n_qubits, reps=2, entanglement="linear")
 vqc = VQC(
     feature_map=feature_map,
     ansatz=ansatz,
-    optimizer=COBYLA(maxiter=100)
+    optimizer=COBYLA(maxiter=200)
 )
 
-print("Entraînement du VQC en cours sur vos données...")
+print("Entraînement du VQC en cours...")
 vqc.fit(train_features, train_labels)
 
 
 score = vqc.score(test_features, test_labels)
 print(f"Précision (Accuracy) sur le jeu de test : {score * 100:.2f} %")
+
+# Prédictions sur le jeu de test
+y_pred = vqc.predict(test_features)
+
+print("Matrice de confusion :")
+print(confusion_matrix(test_labels, y_pred))
+
+print("\nRapport détaillé :")
+print(classification_report(test_labels, y_pred, target_names=["Faillite (0)", "Saine (1)"]))
