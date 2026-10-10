@@ -11,7 +11,7 @@ from qiskit_algorithms.utils import algorithm_globals
 from qiskit_machine_learning.algorithms import VQC
 
 
-df = pd.read_csv("american_bankruptcy_dataset.csv")
+df = pd.read_csv("dataset_paper/dataset_paper/financial_train.csv")
 
 # y (minuscule) = la cible (0 = faillite, 1 = saine)
 y = df["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
