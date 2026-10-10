@@ -13,11 +13,10 @@ from qiskit_machine_learning.algorithms import VQC
 
 df = pd.read_csv("dataset_paper/dataset_paper/financial_train.csv")
 
-# y (minuscule) = la cible (0 = faillite, 1 = saine)
+#y (minuscule) = la cible (0 = faillite, 1 = saine)
 y = df["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
-
-# X (majuscule) = la matrice des 18 ratios financiers
-X_df = df.drop(columns=["status_label", "fyear", "company_name", "Division", "MajorGroup"])
+#X (majuscule) = la matrice des 18 ratios financiers
+X_df = df.drop(columns=["status_label", "fyear", "cik"])
 X = X_df.to_numpy(dtype=float)
 
 
@@ -27,7 +26,7 @@ np.random.seed(123)
 idx_0 = np.where(y == 0)[0]  # indices des faillites
 idx_1 = np.where(y == 1)[0]  # indices des saines
 
-n_samples = min(1000, len(idx_0), len(idx_1))
+n_samples = min(200, len(idx_0), len(idx_1))
 
 chosen_0 = np.random.choice(idx_0, size=n_samples, replace=False)
 chosen_1 = np.random.choice(idx_1, size=n_samples, replace=False)
