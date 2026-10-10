@@ -81,7 +81,7 @@ print("Entraînement du VQC en cours sur vos données...")
 progress = tqdm(
     total=maxiter,
     desc="Entraînement VQC",
-    bar_format="{desc}: {percentage:3.0f}% {bar} | {elapsed}",
+    bar_format="{desc}: {percentage:3.0f}% {bar} | Temps écoulé: {elapsed}, Temps restant: {remaining}",
 )
 
 try:
