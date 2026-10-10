@@ -63,7 +63,7 @@ n_qubits = 6
 feature_map = ZZFeatureMap(feature_dimension=n_qubits, reps=1, entanglement="linear")
 ansatz = RealAmplitudes(num_qubits=n_qubits, reps=2, entanglement="linear")
 
-maxiter = 1000
+maxiter = 100
 
 
 def callback(weights, loss):
@@ -81,7 +81,7 @@ print("Entraînement du VQC en cours sur vos données...")
 progress = tqdm(
     total=maxiter,
     desc="Entraînement VQC",
-    bar_format="{desc}: {percentage:3.0f}% {bar} | Temps écoulé: {elapsed}, Temps restant: {remaining}",
+    bar_format="{desc}: {percentage:3.0f}% {bar} | Temps écoulé: {elapsed}, Temps restant: ~{remaining}",
 )
 
 try:
