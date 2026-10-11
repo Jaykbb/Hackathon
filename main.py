@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA
+from sklearn.feature_selection import SelectKBest, f_classif  # Ajout pour remplacer la PCA
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 
@@ -21,7 +21,6 @@ X_df = df.drop(columns=["status_label", "fyear", "cik"])
 X = X_df.to_numpy(dtype=float)
 
 
-
 np.random.seed(123)
 
 idx_0 = np.where(y == 0)[0]  # indices des faillites
@@ -40,9 +39,15 @@ y_balanced = y[indices]
 
 print(f"Jeu équilibré : {len(y_balanced)} entreprises au total ({n_samples} faillites, {n_samples} saines).")
 
+n_qubits = 8
 
-pca = PCA(n_components=6)
-X_5d = pca.fit_transform(X_balanced)
+# REMPLACEMENT DE LA PCA PAR LE SELECTKBEST (Garde votre nom de variable X_5d pour ne rien casser)
+selector = SelectKBest(score_func=f_classif, k=n_qubits)
+X_5d = selector.fit_transform(X_balanced, y_balanced)
+
+# Optionnel : Affiche dans votre terminal quels ratios financiers ont été jugés les plus cruciaux
+selected_features = X_df.columns[selector.get_support()]
+print(f"Ratios financiers sélectionnés pour les qubits : {list(selected_features)}")
 
 # Conversion des valeurs en angles (radians) pour les portes quantiques
 scaler = MinMaxScaler(feature_range=(0, np.pi))
@@ -59,8 +64,8 @@ train_features, test_features, train_labels, test_labels = train_test_split(
 
 
 algorithm_globals.random_seed = 123
-n_qubits = 6
 
+# Votre feature map Pauli configurée à reps=2
 feature_map = PauliFeatureMap(feature_dimension=n_qubits, reps=2, paulis=['Z', 'ZZ'], entanglement="linear")
 ansatz = RealAmplitudes(num_qubits=n_qubits, reps=2, entanglement="linear")
 
