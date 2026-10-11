@@ -9,6 +9,7 @@ from qiskit.circuit.library import ZZFeatureMap, RealAmplitudes
 from qiskit_machine_learning.optimizers import COBYLA
 from qiskit_algorithms.utils import algorithm_globals
 from qiskit_machine_learning.algorithms import VQC
+from qiskit.circuit.library import PauliFeatureMap
 from tqdm.auto import tqdm
 
 df = pd.read_csv("dataset_paper/dataset_paper/financial_train.csv")
@@ -40,7 +41,7 @@ y_balanced = y[indices]
 print(f"Jeu équilibré : {len(y_balanced)} entreprises au total ({n_samples} faillites, {n_samples} saines).")
 
 
-pca = PCA(n_components=10)
+pca = PCA(n_components=6)
 X_5d = pca.fit_transform(X_balanced)
 
 # Conversion des valeurs en angles (radians) pour les portes quantiques
@@ -58,9 +59,9 @@ train_features, test_features, train_labels, test_labels = train_test_split(
 
 
 algorithm_globals.random_seed = 123
-n_qubits = 10
+n_qubits = 6
 
-feature_map = ZZFeatureMap(feature_dimension=n_qubits, reps=2, entanglement="linear")
+feature_map = PauliFeatureMap(feature_dimension=n_qubits, reps=2, paulis=['Z', 'ZZ'], entanglement="linear")
 ansatz = RealAmplitudes(num_qubits=n_qubits, reps=2, entanglement="linear")
 
 maxiter = 300
