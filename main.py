@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_selection import SelectKBest, f_classif  # Ajout pour remplacer la PCA
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
 # Imports Qiskit
 from qiskit.circuit.library import ZZFeatureMap, RealAmplitudes
@@ -12,7 +12,13 @@ from qiskit_machine_learning.algorithms import VQC
 from qiskit.circuit.library import PauliFeatureMap
 from tqdm.auto import tqdm
 
-df = pd.read_csv("dataset_paper/dataset_paper/financial_train.csv")
+# Import Classique (Gradient Boosting)
+from xgboost import XGBClassifier
+
+# =============================================================
+# 1. DONNÉES D'ENTRAÎNEMENT (df_train)
+# =============================================================
+df_train = pd.read_csv("dataset_paper/dataset_paper/financial_train.csv")
 
 #y (minuscule) = la cible (0 = faillite, 1 = saine)
 y = df["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
@@ -23,10 +29,10 @@ X = X_df.to_numpy(dtype=float)
 
 np.random.seed(123)
 
-idx_0 = np.where(y == 0)[0]  # indices des faillites
-idx_1 = np.where(y == 1)[0]  # indices des saines
+idx_0 = np.where(y_train == 0)[0]
+idx_1 = np.where(y_train == 1)[0]
 
-n_samples = min(1000, len(idx_0), len(idx_1))
+n_samples = min(500, len(idx_0), len(idx_1))
 
 chosen_0 = np.random.choice(idx_0, size=n_samples, replace=False)
 chosen_1 = np.random.choice(idx_1, size=n_samples, replace=False)
@@ -34,10 +40,10 @@ chosen_1 = np.random.choice(idx_1, size=n_samples, replace=False)
 indices = np.concatenate([chosen_0, chosen_1])
 np.random.shuffle(indices)
 
-X_balanced = X[indices]
-y_balanced = y[indices]
+X_train_balanced = X_train[indices]
+y_train_balanced = y_train[indices]
 
-print(f"Jeu équilibré : {len(y_balanced)} entreprises au total ({n_samples} faillites, {n_samples} saines).")
+print(f"Jeu d'entraînement équilibré : {len(y_train_balanced)} entreprises ({n_samples} faillites, {n_samples} saines).")
 
 n_qubits = 8
 
@@ -49,20 +55,30 @@ X_5d = selector.fit_transform(X_balanced, y_balanced)
 selected_features = X_df.columns[selector.get_support()]
 print(f"Ratios financiers sélectionnés pour les qubits : {list(selected_features)}")
 
-# Conversion des valeurs en angles (radians) pour les portes quantiques
 scaler = MinMaxScaler(feature_range=(0, np.pi))
-X_scaled = scaler.fit_transform(X_5d)
+train_features_vqc = scaler.fit_transform(X_train_pca)
+train_labels = y_train_balanced
 
+# =============================================================
+# 2. DONNÉES DE TEST (df_test)
+# =============================================================
+df_test = pd.read_csv("dataset_paper/dataset_paper/financial_test.csv")
 
-train_features, test_features, train_labels, test_labels = train_test_split(
-    X_scaled,
-    y_balanced,
-    train_size=0.8,
-    random_state=123,
-    stratify=y_balanced
-)
+test_labels = df_test["status_label"].apply(lambda val: 1 if val == "alive" else 0).to_numpy()
 
+X_test_df = df_test.drop(columns=[c for c in colonnes_a_retirer if c in df_test.columns])
+X_test = X_test_df.to_numpy(dtype=float)
+X_test = np.nan_to_num(X_test, nan=0.0, posinf=0.0, neginf=0.0)
 
+# Projection PCA et normalisation pour le VQC
+X_test_pca = pca.transform(X_test)
+test_features_vqc = scaler.transform(X_test_pca)
+
+print(f"Jeu de test prêt : {len(test_labels)} entreprises.\n")
+
+# =============================================================
+# 3. MODÈLE QUANTIQUE (VQC - 6 QUBITS)
+# =============================================================
 algorithm_globals.random_seed = 123
 
 # Votre feature map Pauli configurée à reps=2
@@ -78,8 +94,7 @@ def callback(weights, loss):
 vqc = VQC(
     feature_map=feature_map,
     ansatz=ansatz,
-    optimizer=COBYLA(maxiter=maxiter),
-    callback=callback
+    optimizer=COBYLA(maxiter=200)
 )
 
 print("Entraînement du VQC en cours sur vos données...")
