@@ -9,6 +9,7 @@ from qiskit.circuit.library import ZZFeatureMap, RealAmplitudes
 from qiskit_machine_learning.optimizers import COBYLA
 from qiskit_algorithms.utils import algorithm_globals
 from qiskit_machine_learning.algorithms import VQC
+from tqdm.auto import tqdm
 
 # Import Classique (Gradient Boosting)
 from xgboost import XGBClassifier
